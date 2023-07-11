@@ -1,0 +1,170 @@
+---
+title: "GCCR004 Data Analysis - Part 0"
+author: "Ha Nguyen"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  pdf_document: default
+  html_notebook: default
+Note: Updated data analysis in November 2021; Data cleaning and processing  
+  After this you can run either Part 1 or Part 2 of the data analyses.  
+---
+Packages used in this R script:questionr, tidyverse, datawrangling, FactoMineR, ggpubr, yarrr
+```{r, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
+# Custom install:`install.packages(c("MuMIn", "lsmeans"))`
+# install datawrangling: devtools::install_github("https://github.com/dr-JT/datawrangling")
+# load packages
+Packages <- c("tidyverse", "Hmisc", "FactoMineR", "questionr", "cluster", "lme4","nlme","multcomp","ggpubr","MuMIn","effects","LMERConvenienceFunctions","lsmeans",
+              "datawrangling","factoextra","plotly","yarrr","cowplot","ggExtra","blandr","sjstats","car")
+lapply(Packages, library, character.only = TRUE)
+```
+
+
+```{r, echo=FALSE}
+# Import data
+dat_raw<-read.csv("data/raw_data_edit.csv",header = T,na.strings = c("","NA")) # 12173 obs. of 76 variables (removed 35 rows from the raw data as described in the raw_data_edit.docx)
+```
+
+Working data set: [consent=="Yes",session==1] - Remove participants who stopped the survey at 'any-ri' (==NA) - Remove columns with all observations missing (covid_other, non_covid, non_covid_date, taste_other_6m)
+```{r, echo=FALSE}
+dat<- subset(dat_raw, session == "1" & consent == "Yes" & any_ri != "NA") # n=(10953-35=10918)
+dat<- dplyr::select(dat,-c("covid_other","non_covid","non_covid_date","taste_other_6m")) # remove 4 missing data columns
+```
+
+### Convert 'check boxes' questions into binary variables
+```{r, echo=FALSE}
+library(questionr)
+dat_choice<-cbind(multi.split(dat$ri,split.char="; "),multi.split(dat$symptoms,split.char="; "),
+      multi.split(dat$conditions,split.char="; "), multi.split(dat$smell_qual_6m,split.char="; "),
+      multi.split(dat$smell_qual_today,split.char="; "), 
+      multi.split(dat$taste_qual_6m,split.char="; "))
+names(dat_choice)<-substring(names(dat_choice),5)
+dat<-cbind(dat,dat_choice) # New data set with new dummy variables
+remove(dat_choice) # remove unused data
+```
+
+### Recode 'born' into 6 categories ('born_rec')
+```{r, echo=FALSE}
+dat$born_rec <- cut(dat$born,
+  include.lowest = FALSE,
+  right = FALSE,
+  dig.lab = 4,
+  breaks = c(1930, 1940, 1950, 1960, 1970, 1980, 1990,2003)
+)
+```
+
+### Create "age" variable
+```{r, echo=FALSE}
+dat$age<-2021-dat$born
+```
+
+### Recode 'education' into 4 categories (education_rec)
+```{r, echo=FALSE}
+library(tidyverse)
+## Recoding dat$education into dat$education_rec
+dat$education_rec <- fct_recode(dat$education,
+  "0-7" = "<8",
+  "20+" = ">25",
+  "8-14" = "10",
+  "8-14" = "11",
+  "8-14" = "12",
+  "8-14" = "13",
+  "8-14" = "14",
+  "15-19" = "15",
+  "15-19" = "16",
+  "15-19" = "17",
+  "15-19" = "18",
+  "15-19" = "19",
+  "20+" = "20-24",
+  "8-14" = "8",
+  "8-14" = "9"
+)
+```
+
+### Set row names and factors
+```{r, echo=FALSE}
+c.names<-names(dplyr::select(dat,-c(age,rating_blockage_6m,rating_smell_6m,rating_taste_6m,rating_oral_6m,rating_smell_today,rating_blockage_today,rating_taste_today,rating_oral_today,smell_cosmetics_intensity,smell_spice_intensity,smell_fruit_intensity,smell_other_intensity,nasalirritation_intensity,sweet_intensity,salty_intensity,sour_intensity,bitter_intensity,oralirritation_intensity,period_covid,period_ri)))
+dat[,c.names]<-lapply(dat[,c.names],factor)
+remove(c.names)
+
+row.names(dat)<-dat[,1] # row names as "id"
+```
+
+### Recode 'symptoms' as 'Smell_taste_changes' (including 'Changes in smell', 'Changes in taste', and  'Changes in food flavor', smell_qual_today!="NA"), 'Other_symptoms', and 'No_symptoms'
+```{r, echo=FALSE}
+dat$symptoms_rec = ifelse(dat$symptoms.Changes_in_taste ==1, "Smell_taste_changes",
+                          ifelse(dat$symptoms.Changes_in_smell==1, "Smell_taste_changes",
+                                 ifelse(dat$symptoms.Changes_in_food_flavor==1, "Smell_taste_changes",
+                                        ifelse(dat$smell_qual_today.none==0, "Smell_taste_changes", # according to smell_quality_today
+                                          ifelse(dat$symptoms.none==1, "No_symptoms", "Other_symptoms")))))
+dat$symptoms_rec<-as.factor(dat$symptoms_rec)
+```
+
+### Create 6 groups for the combination of 'covid' and 'symptoms_rec': COVID, Unknown COVID, No COVID, Smell/taste changes, Other symptoms, and No symptoms
+```{r, echo=FALSE}
+dat<-dat %>%
+  mutate(
+    group = case_when(
+      covid=="Yes - diagnosed by medical symptoms only"|covid=="Yes - diagnosed with viral swab"|covid=="Yes - diagnosed with another lab test" ~ "COVID",
+      covid=="Unknown - I was tested but did not get my results"|covid=="No - not diagnosed, but have symptoms" ~ "Unknown COVID",
+      covid=="No - had a negative test, but still have symptoms"|covid=="No - do not have any symptoms" ~ "No COVID",
+      symptoms_rec=="Smell_taste_changes" ~ "Smell/taste changes",
+      symptoms_rec=="Other_symptoms" ~ "Other symptoms",
+      TRUE ~ "No symptoms"
+    )
+  )
+dat$group<-factor(dat$group,levels=c("COVID","Unknown COVID","No COVID","Smell/taste changes","Other symptoms","No symptoms"))
+summary(dat$group)
+```
+
+### Rename variables
+```{r, echo=FALSE}
+dat<-dat %>%
+  rename(
+    Blockage = rating_blockage_today,
+    Smell_ability =rating_smell_today,
+    Taste_ability = rating_taste_today,
+    Oralirritation_ability = rating_oral_today,
+    Cosmetics = smell_cosmetics_intensity,
+    Spices = smell_spice_intensity,
+    Fruits = smell_fruit_intensity,
+    Other_items = smell_other_intensity,
+    Sweet = sweet_intensity,
+    Salty = salty_intensity,
+    Sour = sour_intensity,
+    Bitter = bitter_intensity,
+    Nasalirritation = nasalirritation_intensity,
+    Oralirritation = oralirritation_intensity
+  )
+```
+
+### Compute composite ratings for taste and smell intensities
+```{r, echo=FALSE}
+library(datawrangling)
+dat_c <- dat %>%
+  composite(variables = c("Cosmetics", "Spices", "Fruits", "Other_items"),
+            name = "Smell_intensity",
+            type = "mean",
+            standardize = FALSE, # standardize: Logical. Do you want to calculate the composite based on standardized (z-score) values? (Default = TRUE)
+            missing.allowed = 3) %>% # Smell intensity
+  composite(variables = c("Salty", "Sour", "Sweet", "Bitter"),
+            name = "Taste_intensity",
+            type = "mean",
+            standardize = FALSE,
+            missing.allowed = 3) # taste intensity
+dat<-cbind(dat,dat_c$Taste_intensity,dat_c$Smell_intensity) # adding 2 composite scores to the working data set
+names(dat)[names(dat)=="dat_c$Taste_intensity"]<-"Taste_intensity"
+names(dat)[names(dat)=="dat_c$Smell_intensity"]<-"Smell_intensity"
+remove(dat_c)
+```
+
+### Check missing data and working data sets
+10918 participants have at least one of the ratings - including taste, smell, and chemesthesis self-reporting ability and home-test ratings (6 ratings), which is the current working data for ANOVAs and MFA.
+```{r, echo=FALSE}
+str(dat %>% filter_at(vars("Taste_ability","Smell_ability","Oralirritation_ability"),all_vars(is.na(.)))) # n=10918; participants have at least one of the ratings - including taste, smell, and chemesthesis self-reporting ability and home-test ratings (6 ratings), which is the current working data for ANOVAs and MFA.
+```
+
+8319 participants have the 6 ratings (they evaluated at least one food item for each of taste, smell, and chemethesis ratings) - This dataset was used for Hierarchical Cluster Analysis. The clustering was based on the three home-test ratings only.
+```{r, echo=FALSE}
+str(is.na(dplyr::select(dat,c(Taste_intensity,Smell_intensity,Oralirritation)))) # n=8319
+str(na.omit(dplyr::select(dat,c(Taste_ability,Smell_ability,Oralirritation_ability,Taste_intensity,Smell_intensity,Oralirritation)))) #n=8319
+```

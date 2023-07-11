@@ -1,0 +1,521 @@
+---
+title: "GCCR004 Data Analysis - Part 2"
+author: "Javier Albayay"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  pdf_document: default
+  html_notebook: default
+Note: This part includes the visualization on overall self-reported (survey) abilities and experienced (hometest) intensities, and the visualization and ANOVAs on the 6 groups.
+---
+
+# 1. Visualization of overall self-reported abilities and experienced intensities (all participants)
+Compute composite ratings for the intensity of taste with odor and odorless
+```{r}
+# library(datawrangling)
+
+# taste intensity - odorless (salty, sweet)
+dataTasteOdorless <- dat_raw %>%
+  composite(variables = c("salty_intensity", "sweet_intensity"),
+            name = "taste_intensity_odorless",
+            type = "mean",
+            standardize = FALSE,
+            missing.allowed = 3)
+
+
+# taste intensity - with odor (sour, bitter)
+dataTasteWithOdor <- dat_raw %>%
+  composite(variables = c("sour_intensity", "bitter_intensity"),
+            name = "taste_intensity_with_odor",
+            type = "mean",
+            standardize = FALSE,
+            missing.allowed = 3)
+```
+
+### Supp. Figure 4. Correlations between chemosensory intensity perception in the home test and the corresponding self-reported chemosensory ability
+#### Smell
+```{r}
+library(ggpubr)
+library("ggExtra")
+library(cowplot)
+library(see)
+# color code "#638FBB","#EC922D","#178F8C" for smell
+smell_corr_plotA <- ggscatter(dat, x = "Smell_intensity", y = "Smell_ability", size = 0.3, color = "#638FBB",  xlab = "Intensity", ylab = "Ability", alpha = 0.5, title = "", add = "reg.line", conf.int = TRUE, add.params = list(color = "#638FBB", fill = "#638FBB")) + # "#FF00FF"
+
+# https://ggplot2.tidyverse.org/reference/annotate.html
+annotate("rect", xmin = 2, xmax = 47, ymin = 90, ymax = 98, alpha = 0.2, fill = "#638FBB") +
+annotate("text", x = 14, y = 94, label = "paste(italic(r), \" = .84, \")", parse = TRUE) +
+annotate("text", x = 34, y = 94, label = "paste(italic(p), \" < 0.001\")", parse = TRUE) +
+  
+#stat_cor(method = "spearman", label.y = 6, show.legend = FALSE, label.x.npc = 0.5) +
+  
+ggtitle("Smell") + theme(plot.title = element_text(hjust = 0.5)) + theme(plot.title = element_text(face = "bold")) +
+  
+scale_y_continuous(breaks = scales::pretty_breaks(n = 6)) +
+scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
+
+border()
+
+smell_corr_plotA
+
+ggsave("Scatter_Smell_all.jpg", width = 4, height = 4)
+
+#http://www.andersoloflarsson.se/2019/06/23/wes-anderson-palettes-for-tableau/
+```
+
+#### Taste
+```{r}
+smell_corr_plotB <- ggscatter(dat, x = "Taste_intensity", y = "Taste_ability", size = 0.3, color = "#EC922D",  xlab = "Intensity", ylab = "Ability", alpha = 0.5, title = "", add = "reg.line", conf.int = TRUE, add.params = list(color = "#EC922D", fill = "#EC922D")) + # "#FF00FF"
+
+annotate("rect", xmin = 2, xmax = 47, ymin = 90, ymax = 98, alpha = 0.2, fill = "#EC922D") +
+annotate("text", x = 14, y = 94, label = "paste(italic(r), \" = .68, \")", parse = TRUE) +
+annotate("text", x = 34, y = 94, label = "paste(italic(p), \" < 0.001\")", parse = TRUE) +
+  
+#stat_cor(method = "spearman", label.y = 6, show.legend = FALSE, label.x.npc = 0.5) +
+  
+ggtitle("Taste") + theme(plot.title = element_text(hjust = 0.5)) + theme(plot.title = element_text(face = "bold")) +
+  
+scale_y_continuous(breaks = scales::pretty_breaks(n = 6)) +
+scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
+
+border()
+
+smell_corr_plotB
+
+ggsave("Scatter_Taste_all.jpg", width = 4, height = 4)
+```
+
+#### Chemesthesis
+```{r}
+smell_corr_plotC <- ggscatter(dat, x = "Oralirritation", y = "Oralirritation_ability", size = 0.3, color = "#178F8C",  xlab = "Intensity", ylab = "Ability", alpha = 0.5, title = "", add = "reg.line", conf.int = TRUE, add.params = list(color = "#178F8C", fill = "#178F8C")) + # "#FF00FF"
+
+annotate("rect", xmin = 2, xmax = 47, ymin = 90, ymax = 98, alpha = 0.2, fill = "#178F8C") +
+annotate("text", x = 14, y = 94, label = "paste(italic(r), \" = .37, \")", parse = TRUE) +
+annotate("text", x = 34, y = 94, label = "paste(italic(p), \" < 0.001\")", parse = TRUE) +
+  
+#stat_cor(method = "spearman", label.y = 6, show.legend = FALSE, label.x.npc = 0.5) +
+  
+ggtitle("Chemesthesis") + theme(plot.title = element_text(hjust = 0.5)) + theme(plot.title = element_text(face = "bold")) +
+  
+scale_y_continuous(breaks = scales::pretty_breaks(n = 6)) +
+scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
+
+border()
+
+smell_corr_plotC
+
+ggsave("Scatter_Chemesthesis_all.jpg", width = 4, height = 4)
+```
+#### Merge scatter plots (Smell + Taste + Chemesthesis)
+```{r}
+FigureScatter <- ggarrange(smell_corr_plotA, smell_corr_plotB, smell_corr_plotC,
+        labels = c("A", "B", "C"),
+        ncol = 1, nrow = 3, common.legend = FALSE, hjust = 0) #, widths  = c(1, 0.45)) 
+
+FigureScatter
+
+ggsave("FigureScatter.jpg", width = 4, height = 12)
+```
+
+# 2. Visualization and ANOVAs on the 6 groups
+## Figure 2. Pirate plots on experienced intensity by 6 groups for taste, smell, and chemesthesis
+### Taste
+```{r}
+#dat$group3 = factor(dat$group, levels=c("COVID","Unknown COVID","No COVID","Smell/taste changes","Other symptoms","No symptoms"))
+# this had alread been done in the first notebook... 
+#dat$group3 <- fct_recode(dat$group2, "COVID" = 'COVID', "No COVID" = 'No COVID', "Unknown COVID" = 'Unknown_COVID', "Smell/Taste Changes" = 'Smell_taste_changes', "Other Symptoms" = 'Other_symptoms', "No Symptoms" = 'No_symptoms')
+library(yarrr)
+lablist.y<-as.vector(c("0", "20", "40", "60", "80", "100"))
+pdf(file = "figures/Figure 2_Taste.pdf", width = 12, height = 6) 
+
+ppTASTE <- pirateplot(formula = Taste_intensity ~ group, 
+data = dat,
+theme = 2,
+main = "",
+ylab = "", yaxt = "n", # remove Y axis to add a new one after
+ylim = c(0, 100), 
+xlab = "Group", cex.lab=1.5,
+bean.b.o = 1, # borde violin
+bean.f.col = "white",
+bean.b.col = "black",
+jitter.val = 0.05, # dispersión de los puntos
+point.o = 0.15, # point opacity 
+point.pch = 20, # forma de los puntos
+point.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538"), # point color by group
+point.cex = 0.5,
+#bar.f.o = 0.5, bar.b.o = 1, # barplot
+gl.col = "white", #  gridlines
+avg.line.fun = mean,
+inf.method = "iqr", # rango interquartil
+inf.disp = "bean",
+inf.f.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538")) +
+
+mtext("", side=3, outer=T, adj=0.0, line=-1.5, font=2, cex=2)
+axis(2, at = seq(from = 0, to = 100, by = 20), cex.axis=1.5, labels = FALSE, tck=-0.01)  # new y axis with less breaks
+axis(3, at=3.5, labels=c("Taste"), tck=0, cex.axis=1.5, font=2) 
+text(y = seq(0, 100, by=20), par("usr")[1], labels = lablist.y, srt = 0, pos = 2, xpd = TRUE, cex = 1.5)
+title(ylab = "Intensity", col.lab ="black", cex.lab=1.5)
+
+ppTASTE
+
+dev.off()
+```
+### Smell
+```{r}
+
+# see above
+#dat$group3 = factor(dat$group, levels=c("COVID","Unknown COVID","No COVID","Smell/taste changes","Other symptoms","No symptoms"))
+
+#data$group3 <- fct_recode(data$group2, "COVID" = 'COVID', "No COVID" = 'No_COVID', "Unknown COVID" = 'Unknown_COVID', "Smell/Taste Changes" = 'Smell_taste_changes', "Other Symptoms" = 'Other_symptoms', "No Symptoms" = 'No_symptoms')
+
+pdf(file = "figures/Figure 2_Smell.pdf", width = 12, height = 6) 
+
+ppSMELL <- pirateplot(formula = Smell_intensity ~ group, 
+data = dat,
+theme = 2,
+main = "",
+ylab = "", yaxt = "n", # remove Y axis to add a new one after
+ylim = c(0, 100), 
+xlab = "Group", cex.lab=1.5,
+bean.b.o = 1, # borde violin
+bean.f.col = "white",
+bean.b.col = "black",
+jitter.val = 0.05, # dispersión de los puntos
+point.o = 0.15, # point opacity 
+point.pch = 20, # forma de los puntos
+point.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538"), # point color by group
+point.cex = 0.5,
+#bar.f.o = 0.5, bar.b.o = 1, # barplot
+gl.col = "white", #  gridlines
+avg.line.fun = mean,
+inf.method = "iqr", # rango interquartil
+inf.disp = "bean",
+inf.f.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538")) +
+
+mtext("", side=3, outer=T, adj=0.0, line=-1.5, font=2, cex=2)
+axis(2, at = seq(from = 0, to = 100, by = 20), cex.axis=1.5, labels = FALSE, tck=-0.01)  # new y axis with less breaks
+axis(3, at=3.5, labels=c("Smell"), tck=0, cex.axis=1.5, font=2) 
+text(y = seq(0, 100, by=20), par("usr")[1], labels = lablist.y, srt = 0, pos = 2, xpd = TRUE, cex = 1.5)
+title(ylab = "Intensity", col.lab ="black", cex.lab=1.5)
+
+ppSMELL
+
+dev.off()
+
+```
+### Chemesthesis
+```{r}
+#dat$group3 = factor(dat$group, levels=c("COVID","Unknown COVID","No COVID","Smell/taste changes","Other symptoms","No symptoms"))
+
+pdf(file = "figures/Figure 2_Chemesthesis.pdf", width = 12, height = 6) 
+
+ppSMELL <- pirateplot(formula = Oralirritation ~ group, 
+data = dat,
+theme = 2,
+main = "",
+ylab = "", yaxt = "n", # remove Y axis to add a new one after
+ylim = c(0, 100), 
+xlab = "Group", cex.lab=1.5,
+bean.b.o = 1, # borde violin
+bean.f.col = "white",
+bean.b.col = "black",
+jitter.val = 0.05, # dispersión de los puntos
+point.o = 0.15, # point opacity 
+point.pch = 20, # forma de los puntos
+point.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538"), # point color by group
+point.cex = 0.5,
+#bar.f.o = 0.5, bar.b.o = 1, # barplot
+gl.col = "white", #  gridlines
+avg.line.fun = mean,
+inf.method = "iqr", # rango interquartil
+inf.disp = "bean",
+inf.f.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538")) +
+
+mtext("", side=3, outer=T, adj=0.0, line=-1.5, font=2, cex=2)
+axis(2, at = seq(from = 0, to = 100, by = 20), cex.axis=1.5, labels = FALSE, tck=-0.01)  # new y axis with less breaks
+axis(3, at=3.5, labels=c("Chemesthesis"), tck=0, cex.axis=1.5, font=2) 
+text(y = seq(0, 100, by=20), par("usr")[1], labels = lablist.y, srt = 0, pos = 2, xpd = TRUE, cex = 1.5)
+title(ylab = "Intensity", col.lab ="black", cex.lab=1.5)
+
+ppSMELL
+
+dev.off()
+```
+
+## Supp. Figure 1. Perceived intensity of pure taste items (sugar and salt) for six groups.
+(Need to add here)
+
+
+## Supp. Figure 3. Self-reported ability to taste, smell, and experience irritation for six groups.
+### Smell
+```{r}
+#library(yarrr)
+#lablist.y<-as.vector(c("0", "20", "40", "60", "80", "100"))
+
+#dat$group3 = factor(dat$group, levels=c("COVID","Unknown COVID","No COVID","Smell/taste changes","Other symptoms","No symptoms"))
+
+pdf(file = "figures/Supp. Figure 1_Smell.pdf", width = 12, height = 6) 
+
+ppSMELL <- pirateplot(formula = Smell_ability ~ group, 
+data = dat,
+theme = 2,
+main = "",
+ylab = "", yaxt = "n", # remove Y axis to add a new one after
+ylim = c(0, 100), 
+xlab = "Group", cex.lab=1.5,
+bean.b.o = 1, # borde violin
+bean.f.col = "white",
+bean.b.col = "black",
+jitter.val = 0.05, # dispersión de los puntos
+point.o = 0.15, # point opacity 
+point.pch = 20, # forma de los puntos
+point.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538"), # point color by group
+point.cex = 0.5,
+#bar.f.o = 0.5, bar.b.o = 1, # barplot
+gl.col = "white", #  gridlines
+avg.line.fun = mean, # instead of median
+inf.method = "iqr", # rango interquartil
+inf.disp = "bean",
+inf.f.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538")) +
+
+mtext("", side=3, outer=T, adj=0.0, line=-1.5, font=2, cex=2)
+axis(2, at = seq(from = 0, to = 100, by = 20), cex.axis=1.5, labels = FALSE, tck=-0.01)  # new y axis with less breaks
+axis(3, at=3.5, labels=c("Smell"), tck=0, cex.axis=1.5, font=2) 
+text(y = seq(0, 100, by=20), par("usr")[1], labels = lablist.y, srt = 0, pos = 2, xpd = TRUE, cex = 1.5)
+title(ylab = "Ability", col.lab ="black", cex.lab=1.5)
+
+ppSMELL
+
+dev.off()
+```
+
+### Taste
+```{r}
+#dat$group3 = factor(dat$group, levels=c("COVID","Unknown COVID","No COVID","Smell/taste changes","Other symptoms","No symptoms"))
+
+pdf(file = "figures/Supp. Figure 1_Taste.pdf", width = 12, height = 6) 
+
+ppTASTE <- pirateplot(formula = Taste_ability ~ group, 
+data = dat,
+theme = 2,
+main = "",
+ylab = "", yaxt = "n", # remove Y axis to add a new one after
+ylim = c(0, 100), 
+xlab = "Group", cex.lab=1.5,
+bean.b.o = 1, # borde violin
+bean.f.col = "white",
+bean.b.col = "black",
+jitter.val = 0.05, # dispersión de los puntos
+point.o = 0.15, # point opacity 
+point.pch = 20, # forma de los puntos
+point.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538"), # point color by group
+point.cex = 0.5,
+#bar.f.o = 0.5, bar.b.o = 1, # barplot
+gl.col = "white", #  gridlines
+avg.line.fun = mean,
+inf.method = "iqr", # rango interquartil
+inf.disp = "bean",
+inf.f.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538")) +
+
+mtext("", side=3, outer=T, adj=0.0, line=-1.5, font=2, cex=2)
+axis(2, at = seq(from = 0, to = 100, by = 20), cex.axis=1.5, labels = FALSE, tck=-0.01)  # new y axis with less breaks
+axis(3, at=3.5, labels=c("Taste"), tck=0, cex.axis=1.5, font=2) 
+text(y = seq(0, 100, by=20), par("usr")[1], labels = lablist.y, srt = 0, pos = 2, xpd = TRUE, cex = 1.5)
+title(ylab = "Ability", col.lab ="black", cex.lab=1.5)
+
+ppTASTE
+
+dev.off()
+```
+
+### Chemesthesis
+```{r}
+#dat$group3 = factor(dat$group, levels=c("COVID","Unknown COVID","No COVID","Smell/taste changes","Other symptoms","No symptoms"))
+
+pdf(file = "figures/Supp. Figure 1_Chemesthesis.pdf",   
+    width = 12, height = 6) 
+
+ppORAL <- pirateplot(formula = Oralirritation_ability ~ group, 
+data = dat,
+theme = 2,
+main = "",
+ylab = "", yaxt = "n", # remove Y axis to add a new one after
+ylim = c(0, 100), 
+xlab = "Group", cex.lab=1.5,
+bean.b.o = 1, # borde violin
+bean.f.col = "white",
+bean.b.col = "black",
+jitter.val = 0.05, # dispersión de los puntos
+point.o = 0.15, # point opacity 
+point.pch = 20, # forma de los puntos
+point.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538"), # point color by group
+point.cex = 0.5,
+#bar.f.o = 0.5, bar.b.o = 1, # barplot
+gl.col = "white", #  gridlines
+avg.line.fun = mean,
+inf.method = "iqr", # rango interquartil
+inf.disp = "bean",
+inf.f.col = c("#bd0000", "#da6142", "#f19d83","#9d9bb7", "#5e5d75", "#252538")) +
+
+mtext("", side=3, outer=T, adj=0.0, line=-1.5, font=2, cex=2)
+axis(2, at = seq(from = 0, to = 100, by = 20), cex.axis=1.5, labels = FALSE, tck=-0.01)  # new y axis with less breaks
+axis(3, at=3.5, labels=c("Chemesthesis"), tck=0, cex.axis=1.5, font=2) 
+text(y = seq(0, 100, by=20), par("usr")[1], labels = lablist.y, srt = 0, pos = 2, xpd = TRUE, cex = 1.5)
+title(ylab = "Ability", col.lab ="black", cex.lab=1.5)
+
+ppORAL
+
+dev.off()
+```
+
+# 3. Supp. Table 3. Pairwise comparisons the six diagnostic groups for perceived intensity and reported ability.
+### ANOVAs on experienced intensities 
+- Hypothesis 3b: Participants with COVID-19 (COVID+) will exhibit a reduced experienced intensity to smell [taste, irritation] than participants without COVID-19 (COVID-) and also those with other respiratory illnesses (non-COVID) and healthy individuals (healthy). 
+
+- We will compare the experienced chemosensory intensities (​smell_intensity; taste_intensity;​ ​oralirritation_intensity​) between groups using ANOVAs.
+
+### ANOVA - Smell intensity
+```{r}
+# Levene's test
+library(car)
+leveneTest(Smell_intensity ~ group, data = dat)
+# ANOVA
+AnovaSmell <- aov(Smell_intensity ~ group, data = dat)
+options(digits=8)
+summary(AnovaSmell)
+# Homogeneity of variances
+plot(AnovaSmell, 1)
+# Multiple comparisons
+library(multcomp)
+summary(glht(AnovaSmell, linfct = mcp(group = "Tukey")))
+# Effect size
+library(sjstats)
+eta_sq(AnovaSmell, partial = TRUE)
+plot(allEffects(AnovaSmell))
+# Mean smell intensity in the entire sample
+options(digits=4)
+mean(dat$Smell_intensity, na.rm = TRUE)
+sd(data$Smell_intensity, na.rm = TRUE)
+# Descriptives
+describeBy(dat$Smell_intensity, dat$group, mat = TRUE)
+# or
+tapply(dat$Smell_intensity, dat$group, mean, na.rm = TRUE)
+tapply(dat$Smell_intensity, dat$group, sd, na.rm = TRUE)
+```
+
+### ANOVA - Taste intensity
+```{r}
+# Levene's test
+leveneTest(Taste_intensity ~ group, data = dat)
+# ANOVA
+AnovaTaste <- aov(Taste_intensity ~ group, data = dat)
+options(digits=8)
+summary(AnovaTaste)
+# Homogeneity of variances
+plot(AnovaTaste, 1)
+# Multiple comparisons
+summary(glht(AnovaTaste, linfct = mcp(group = "Tukey")))
+# Effect size
+eta_sq(AnovaTaste, partial = TRUE)
+plot(allEffects(AnovaTaste))
+# Mean taste intensity in the entire sample
+options(digits=4)
+mean(dat$Taste_intensity, na.rm = TRUE)
+sd(dat$Taste_intensity, na.rm = TRUE)
+# Descriptives
+describeBy(dat$Taste_intensity, dat$group, mat = TRUE)
+```
+
+### ANOVA - Chemesthesis intensity
+```{r}
+# Levene's test
+leveneTest(Oralirritation ~ group, data = dat)
+# ANOVA
+AnovaORAL <- aov(Oralirritation ~ group, data = dat)
+options(digits=8)
+summary(AnovaORAL)
+#Homogeneity of variances
+plot(AnovaORAL, 1)
+# Multiple comparisons
+summary(glht(AnovaORAL, linfct = mcp(group = "Tukey")))
+# Effect size
+eta_sq(AnovaORAL, partial = TRUE)
+plot(allEffects(AnovaORAL))
+# Mean chemesthesis intensity in the entire sample
+options(digits=4)
+mean(dat$Oralirritation, na.rm = TRUE)
+sd(dat$Oralirritation, na.rm = TRUE)
+# Descriptives
+describeBy(dat$Oralirritation, dat$group, mat = TRUE) 
+```
+## ANOVAs on self-reported abilities (not reported!)
+Hypothesis 3a: Participants with COVID-19 (COVID+) will report a lower ability to smell [taste, experience irritation] than participants without COVID-19 (COVID-) and also those with other respiratory illnesses (non-COVID) and healthy individuals (healthy).
+
+We will compare the reported chemosensory abilities (​rating_oral_today; rating_oral_today; Rating_oral_today​) between groups using ANOVAs.
+
+https://www.datanovia.com/en/lessons/anova-in-r/#check-assumptions-1
+
+### ANOVA - Smell ability
+```{r}
+library(car)
+leveneTest(Smell_ability ~ group, data = dat) 
+
+AnovaSmell <- aov(Smell_ability ~ group, data = dat)
+summary(AnovaSmell)
+
+# Homogeneity of variances
+plot(AnovaSmell, 1)
+
+library(multcomp)
+summary(glht(AnovaSmell, linfct = mcp(group = "Tukey")))
+
+library(sjstats)
+eta_sq(AnovaSmell, partial = TRUE)
+
+tapply(dat$Smell_ability, dat$group, mean, na.rm = TRUE)
+tapply(dat$Smell_ability, dat$group, sd, na.rm = TRUE)
+```
+
+### ANOVA - Taste ability
+```{r}
+library(car)
+leveneTest(Taste_ability ~ group, data = dat)
+
+AnovaTaste <- aov(Taste_ability ~ group, data = dat)
+summary(AnovaTaste)
+
+#Homogeneity of variances
+plot(AnovaTaste, 1)
+
+library(multcomp)
+summary(glht(AnovaTaste, linfct = mcp(group = "Tukey")))
+
+library(sjstats)
+eta_sq(AnovaTaste, partial = TRUE)
+
+tapply(dat$Taste_ability, dat$group, mean, na.rm = TRUE)
+tapply(dat$Taste_ability, dat$group, sd, na.rm = TRUE)
+```
+
+### ANOVA - Chemesthesis ability
+```{r}
+library(car)
+leveneTest(Oralirritation_ability ~ group, data = dat)
+
+AnovaORAL <- aov(Oralirritation_ability ~ group, data = dat)
+summary(AnovaORAL)
+
+# Homogeneity of variances
+plot(AnovaORAL, 1)
+
+library(multcomp)
+summary(glht(AnovaORAL, linfct = mcp(group = "Tukey")))
+
+library(sjstats)
+eta_sq(AnovaORAL, partial = TRUE)
+
+tapply(dat$Oralirritation_ability, dat$group, mean, na.rm = TRUE)
+tapply(dat$Oralirritation_ability, dat$group, sd, na.rm = TRUE)
+```
+
+# 4. Supp. Table 2. Subject characteristics of the six diagnostic groups.
+(need to add here)
